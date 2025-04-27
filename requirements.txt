@@ -1,0 +1,5 @@
+git+https://github.com/dolfies/discord.py-self.git
+google-genai
+python-dotenv
+httpx
+pillow
