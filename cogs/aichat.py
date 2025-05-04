@@ -298,7 +298,7 @@ class AIChatCog(commands.Cog):
         character = resolved.clean_content.split("/")[2].split(".")[0]
         await self.reply(message, character, message.clean_content)
 
-    # 面すオンしたとき
+    # メンションしたとき
     @commands.Cog.listener("on_message")
     async def onMention(self, message: discord.Message):
         if message.author.bot:
@@ -309,7 +309,7 @@ class AIChatCog(commands.Cog):
             return
 
         character = str(self.defaultCharacter.get(message.author.id, 0))
-        await self.reply(message, character, message.clean_content)
+        await self.reply(message, character, message.clean_content.replace("@あいちゃ", ""))
 
     # コマンドを実行したとき
     @commands.command(alias="c")
