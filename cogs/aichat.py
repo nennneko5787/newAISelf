@@ -4,6 +4,7 @@ import os
 import re
 from typing import Dict, List, Union
 
+import aiofiles
 import discord
 import discord.http
 import dotenv
@@ -12,6 +13,7 @@ from discord.ext import commands
 from google import genai
 from google.genai import chats, types
 from PIL import Image
+from pydantic import TypeAdapter
 
 from datas import colours, imageUrl, systemInstructs
 
@@ -36,8 +38,6 @@ SAFETY_SETTINGS = [
     ),
 ]
 
-invisible = "||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​|| _ _ _ _ _ _ "
-
 
 class AIChatCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -46,18 +46,72 @@ class AIChatCog(commands.Cog):
         self.genai = genai.Client(api_key=os.getenv("gemini"))
         self.chats: Dict[int, Dict[str, chats.AsyncChat]] = {}
         self.generating: Dict[int, bool] = {}
+        self.histories: Dict[int, Dict[str, List[types.Content]]] = {}
+        self.defaultCharacter: Dict[int, str] = {}
 
-    async def cog_load():
+    async def cog_load(self):
         if not os.path.exists("chat.json"):
-            with open("chat.json", "w") as f:
-                f.write("{}")
+            async with aiofiles.open("chat.json", "w") as f:
+                await f.write("{}")
+
+        async with aiofiles.open("chat.json", "r") as f:
+            raw = json.loads(await f.read())
+
+        adapter = TypeAdapter(Dict[int, Dict[str, List[types.Content]]])
+        self.histories: Dict[int, Dict[str, List[types.Content]]] = (
+            adapter.validate_python(raw)
+        )
+
+        if not os.path.exists("default.json"):
+            async with aiofiles.open("default.json", "w") as f:
+                await f.write("{}")
+
+        async with aiofiles.open("default.json", "r") as f:
+            raw: Dict[str, str] = json.loads(await f.read())
+
+        self.defaultCharacter: Dict[int, str] = {
+            int(userId): character for userId, character in raw.items()
+        }
 
     async def cog_unload(self):
-        pass
+        asDict = {
+            userId: {
+                character: [chat.model_dump() for chat in chats]
+                for character, chats in characters.items()
+            }
+            for userId, characters in self.histories.items()
+        }
+
+        async with aiofiles.open("chat.json", "w") as f:
+            await f.write(json.dumps(asDict))
+
+        async with aiofiles.open("default.json", "w") as f:
+            await f.write(json.dumps(self.defaultCharacter))
 
     @commands.command()
     async def characters(self, ctx: commands.Context):
         await ctx.reply(f"`{list(systemInstructs.keys())}`")
+
+    @commands.command()
+    async def default(self, ctx: commands.Context, character: str):
+        if character:
+            if character.isdigit():
+                index = int(character)
+                if index < len(systemInstructs.keys()):
+                    character = list(systemInstructs.keys())[index]
+                else:
+                    await ctx.reply(
+                        f"キャラクターのインデックスは`{len(systemInstructs.keys())-1}`まで受け付けています\n`{list(systemInstructs.keys())}`"
+                    )
+                    return
+
+            if not character in systemInstructs:
+                await ctx.reply(
+                    f"キャラクターは`{list(systemInstructs.keys())}`のいずれかでなければいけません"
+                )
+                return
+        self.defaultCharacter[ctx.author.id] = character
+        await ctx.reply(f"デフォルトのキャラクターを`{character}`にセットしました。")
 
     @commands.command()
     async def clear(self, ctx: commands.Context, character: str = None):
@@ -147,11 +201,12 @@ class AIChatCog(commands.Cog):
             self.chats[message.author.id] = dict()
         if not character in self.chats[message.author.id]:
             self.chats[message.author.id][character] = self.genai.aio.chats.create(
-                model="gemini-2.5-preview-03-25",
+                model="gemini-2.0-flash",
                 config=types.GenerateContentConfig(
                     system_instruction=systemInstructs[character],
                     safety_settings=SAFETY_SETTINGS,
                 ),
+                history=self.histories.get(message.author.id, {}).get(character, []),
             )
 
         chat = self.chats[message.author.id][character]
@@ -183,6 +238,8 @@ class AIChatCog(commands.Cog):
 
                 linkStrings: List[str] = []
 
+                linkStrings.append(f"[⁠︎](https://{character}.example.com/)")
+
                 for text in chunks:
                     response = await self.http.post(
                         "https://nemtudo.me/api/tools/embeds",
@@ -199,19 +256,21 @@ class AIChatCog(commands.Cog):
                         await message.reply("生成に失敗しました")
                         return
 
-                    linkStrings.append(f"https://nemtudo.me/e/{jsonData['data']['id']}")
+                    linkStrings.append(
+                        f"[⁠︎](https://nemtudo.me/e/{jsonData['data']['id']})"
+                    )
 
                 try:
-                    await message.reply(
-                        invisible + f"{character}," + " ".join(linkStrings)
-                    )
+                    await message.reply(" ".join(linkStrings))
                 except:
-                    await message.reply(invisible + f"{character}," + linkStrings[0])
+                    await message.reply(" ".join([linkStrings[0], linkStrings[1]]))
         finally:
             self.generating[message.author.id] = False
+            if message.author.id not in self.histories:
+                self.histories[message.author.id] = {}
+            self.histories[message.author.id][character] = chat.get_history()
 
-        print(chat.get_history())
-
+    # メッセージにリプライしたとき
     @commands.Cog.listener("on_message")
     async def onMessage(self, message: discord.Message):
         if not message.reference:
@@ -236,10 +295,24 @@ class AIChatCog(commands.Cog):
         if message.author.bot:
             return
 
-        character = resolved.clean_content.replace(invisible, "").split(",")[0]
+        character = resolved.clean_content.split("/")[2].split(".")[0]
         await self.reply(message, character, message.clean_content)
 
-    @commands.command()
+    # 面すオンしたとき
+    @commands.Cog.listener("on_message")
+    async def onMention(self, message: discord.Message):
+        if message.author.bot:
+            return
+        if message.reference:
+            return
+        if not message.guild.me in message.mentions:
+            return
+
+        character = str(self.defaultCharacter.get(message.author.id, 0))
+        await self.reply(message, character, message.clean_content)
+
+    # コマンドを実行したとき
+    @commands.command(alias="c")
     async def chat(self, ctx: commands.Context, character: str, *, text):
         await self.reply(ctx, character, text)
 
