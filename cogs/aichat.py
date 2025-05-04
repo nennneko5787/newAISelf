@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import re
 from typing import Dict, List, Union
@@ -12,7 +13,7 @@ from google import genai
 from google.genai import chats, types
 from PIL import Image
 
-from datas import systemInstructs, imageUrl, colours
+from datas import colours, imageUrl, systemInstructs
 
 dotenv.load_dotenv()
 
@@ -45,6 +46,14 @@ class AIChatCog(commands.Cog):
         self.genai = genai.Client(api_key=os.getenv("gemini"))
         self.chats: Dict[int, Dict[str, chats.AsyncChat]] = {}
         self.generating: Dict[int, bool] = {}
+
+    async def cog_load():
+        if not os.path.exists("chat.json"):
+            with open("chat.json", "w") as f:
+                f.write("{}")
+
+    async def cog_unload(self):
+        pass
 
     @commands.command()
     async def characters(self, ctx: commands.Context):
@@ -138,7 +147,7 @@ class AIChatCog(commands.Cog):
             self.chats[message.author.id] = dict()
         if not character in self.chats[message.author.id]:
             self.chats[message.author.id][character] = self.genai.aio.chats.create(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-preview-03-25",
                 config=types.GenerateContentConfig(
                     system_instruction=systemInstructs[character],
                     safety_settings=SAFETY_SETTINGS,
@@ -200,6 +209,8 @@ class AIChatCog(commands.Cog):
                     await message.reply(invisible + f"{character}," + linkStrings[0])
         finally:
             self.generating[message.author.id] = False
+
+        print(chat.get_history())
 
     @commands.Cog.listener("on_message")
     async def onMessage(self, message: discord.Message):
