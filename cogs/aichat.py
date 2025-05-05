@@ -230,7 +230,7 @@ class AIChatCog(commands.Cog):
 
                 content = await chat.send_message(messages)
 
-                chunkSize = 100
+                chunkSize = 85
                 chunks = [
                     content.text[i : i + chunkSize]
                     for i in range(0, len(content.text), chunkSize)
