@@ -238,7 +238,7 @@ class AIChatCog(commands.Cog):
 
                 linkStrings: List[str] = []
 
-                linkStrings.append(f"[⁠︎](https://{character}.example.com/)")
+                omg = [f"[⁠︎](https://{character}.local/)"]
 
                 for text in chunks:
                     response = await self.http.post(
@@ -260,10 +260,16 @@ class AIChatCog(commands.Cog):
                         f"[⁠︎](https://nemtudo.me/e/{jsonData['data']['id']})"
                     )
 
-                try:
-                    await message.reply(" ".join(linkStrings))
-                except:
-                    await message.reply(" ".join([linkStrings[0], linkStrings[1]]))
+                chunkSize = 5
+                chunks = [
+                    linkStrings[i : i + chunkSize]
+                    for i in range(0, len(linkStrings), chunkSize)
+                ]
+                for chunk in chunks:
+                    try:
+                        await message.reply(" ".join([omg + chunk]))
+                    except:
+                        await message.reply(" ".join([omg, chunk[1]]))
         finally:
             self.generating[message.author.id] = False
             if message.author.id not in self.histories:
