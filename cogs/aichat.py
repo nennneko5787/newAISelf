@@ -267,9 +267,9 @@ class AIChatCog(commands.Cog):
                 ]
                 for chunk in chunks:
                     try:
-                        await message.reply(" ".join([omg + chunk]))
+                        await message.reply(" ".join(omg + chunk))
                     except:
-                        await message.reply(" ".join([omg, chunk[0]]))
+                        await message.reply(" ".join([omg[0] + chunk[0]]))
         finally:
             self.generating[message.author.id] = False
             if message.author.id not in self.histories:
