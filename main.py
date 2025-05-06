@@ -11,6 +11,7 @@ bot = commands.Bot(("aicha#", "aicha!", "ai#", "ai!"))
 @bot.event
 async def setup_hook():
     await bot.load_extension("cogs.aichat")
+    await bot.load_extension("cogs.help")
 
 
 bot.run(os.getenv("discord"))

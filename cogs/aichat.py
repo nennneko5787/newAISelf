@@ -15,7 +15,7 @@ from google.genai import chats, types
 from PIL import Image
 from pydantic import TypeAdapter
 
-from datas import colours, imageUrl, systemInstructs
+from datas import colours, imageUrl, messages, systemInstructs
 
 dotenv.load_dotenv()
 
@@ -93,23 +93,30 @@ class AIChatCog(commands.Cog):
         await ctx.reply(f"`{list(systemInstructs.keys())}`")
 
     @commands.command()
-    async def default(self, ctx: commands.Context, character: str):
-        if character:
-            if character.isdigit():
-                index = int(character)
-                if index < len(systemInstructs.keys()):
-                    character = list(systemInstructs.keys())[index]
-                else:
-                    await ctx.reply(
-                        f"キャラクターのインデックスは`{len(systemInstructs.keys())-1}`まで受け付けています\n`{list(systemInstructs.keys())}`"
-                    )
-                    return
+    async def default(self, ctx: commands.Context, character: str = None):
+        if not character:
+            for p in self.bot.command_prefix:
+                if ctx.message.content.startswith(p):
+                    prefix = p
+                    break
+            await self.reply(messages.DEFAULTHOWTO.format(prefix=prefix))
+            return
 
-            if not character in systemInstructs:
+        if character.isdigit():
+            index = int(character)
+            if index < len(systemInstructs.keys()):
+                character = list(systemInstructs.keys())[index]
+            else:
                 await ctx.reply(
-                    f"キャラクターは`{list(systemInstructs.keys())}`のいずれかでなければいけません"
+                    f"キャラクターのインデックスは`{len(systemInstructs.keys())-1}`まで受け付けています\n`{list(systemInstructs.keys())}`"
                 )
                 return
+
+        if not character in systemInstructs:
+            await ctx.reply(
+                f"キャラクターは`{list(systemInstructs.keys())}`のいずれかでなければいけません"
+            )
+            return
         self.defaultCharacter[ctx.author.id] = character
         await ctx.reply(f"デフォルトのキャラクターを`{character}`にセットしました。")
 
@@ -315,11 +322,24 @@ class AIChatCog(commands.Cog):
             return
 
         character = str(self.defaultCharacter.get(message.author.id, 0))
-        await self.reply(message, character, message.clean_content.replace("@あいちゃ", ""))
+        await self.reply(
+            message, character, message.clean_content.replace("@あいちゃ", "")
+        )
 
     # コマンドを実行したとき
     @commands.command(alias="c")
-    async def chat(self, ctx: commands.Context, character: str, *, text):
+    async def chat(
+        self, ctx: commands.Context, character: str = None, *, text: str = None
+    ):
+        if not character or not text:
+            for p in self.bot.command_prefix:
+                if ctx.message.content.startswith(p):
+                    prefix = p
+                    break
+
+            await self.reply(messages.CHATHOWTO.format(prefix=prefix))
+            return
+
         await self.reply(ctx, character, text)
 
 
