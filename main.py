@@ -5,7 +5,7 @@ from discord.ext import commands
 
 dotenv.load_dotenv()
 
-bot = commands.Bot(("aicha#", "aicha!", "ai#", "ai!"))
+bot = commands.Bot(("aicha#", "aicha!", "ai#", "ai!"), help_command=None)
 
 
 @bot.event
