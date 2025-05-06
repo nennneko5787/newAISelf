@@ -99,7 +99,7 @@ class AIChatCog(commands.Cog):
                 if ctx.message.content.startswith(p):
                     prefix = p
                     break
-            await self.reply(messages.DEFAULTHOWTO.format(prefix=prefix))
+            await ctx.reply(messages.DEFAULTHOWTO.format(prefix=prefix))
             return
 
         if character.isdigit():
@@ -247,13 +247,13 @@ class AIChatCog(commands.Cog):
 
                 omg = [f"[⁠︎](https://{character}.local/)"]
 
-                for text in chunks:
+                for i, text in enumerate(chunks):
                     response = await self.http.post(
                         "https://nemtudo.me/api/tools/embeds",
                         json={
-                            "title": character,
+                            "title": character if i == 0 else "",
                             "description": text,
-                            "image": imageUrl[character],
+                            "image": imageUrl[character] if i == 0 else "",
                             "thumbImage": True,
                             "color": colours[character],
                         },
@@ -267,7 +267,7 @@ class AIChatCog(commands.Cog):
                         f"[⁠︎](https://nemtudo.me/e/{jsonData['data']['id']})"
                     )
 
-                chunkSize = 5
+                chunkSize = 4
                 chunks = [
                     linkStrings[i : i + chunkSize]
                     for i in range(0, len(linkStrings), chunkSize)
@@ -337,7 +337,7 @@ class AIChatCog(commands.Cog):
                     prefix = p
                     break
 
-            await self.reply(messages.CHATHOWTO.format(prefix=prefix))
+            await ctx.reply(messages.CHATHOWTO.format(prefix=prefix))
             return
 
         await self.reply(ctx, character, text)
