@@ -144,12 +144,14 @@ class AIChatCog(commands.Cog):
             return
         if not character:
             del self.chats[ctx.author.id]
+            del self.histories[ctx.author.id]
             await ctx.reply("会話記録を削除しました。")
         else:
             if not character in self.chats[ctx.author.id]:
                 await ctx.reply(f"`{character}`との会話記録が保存されていません")
                 return
             del self.chats[ctx.author.id][character]
+            del self.histories[ctx.author.id][character]
             await ctx.reply(f"`{character}`との会話記録を削除しました。")
 
     async def reply(
